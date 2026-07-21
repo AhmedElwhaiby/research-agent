@@ -1,85 +1,85 @@
 """
-Wires nodes into a LangGraph StateGraph:
+Shared Groq client + a small helper for JSON-structured calls.
 
-    planner -> research -> synthesizer -> critic --pass--> END
-                                              |
-                                            fail
-                                              v
-                                           reviser --> critic (loop, capped at MAX_ITERATIONS)
-
-The loop's stopping condition lives in _should_continue: pass, or hitting
-MAX_ITERATIONS, both route to END. Failing before the cap routes back to
-reviser. This is the only structural change from the Phase 1 straight line —
-everything before the critic node is unchanged.
+Centralized here so the model name/provider is a one-line change later,
+and so every node calls the LLM the same way.
 """
 
-from langgraph.graph import StateGraph, END
+import os
+import json
+from typing import Any
+from groq import Groq
 
-from graph.state import ResearchState
-from graph.nodes import (
-    planner_node,
-    research_node,
-    synthesizer_node,
-    critic_node,
-    reviser_node,
-    finalize_node,
-    MAX_ITERATIONS,
-)
+MODEL = "openai/gpt-oss-120b"
+
+_client: Groq | None = None
 
 
-def _route_after_critic(state: ResearchState) -> str:
+def _get_client() -> Groq:
+    global _client
+    if _client is None:
+        api_key = os.environ.get("GROQ_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "GROQ_API_KEY not set. Add it to your .env or environment."
+            )
+        _client = Groq(api_key=api_key)
+    return _client
+
+
+def call_llm(
+    system: str,
+    user: str,
+    temperature: float = 0.3,
+    max_tokens: int = 4096,
+) -> str:
     """
-    Conditional edge out of critic_node.
+    Plain text completion.
 
-    Checked in this order: pass first (stop as soon as it's good), then the
-    iteration cap (stop even on failure once we've spent the retry budget —
-    otherwise a persistently failing draft loops forever). Only fails BOTH
-    checks does it go back to reviser.
+    max_tokens defaults to 4096 rather than the API default (often ~1024
+    depending on model) — the synthesizer and reviser produce full markdown
+    reports with a Sources section, and a low cap was silently truncating
+    output mid-report with no error raised. If a response still gets cut off,
+    check response.choices[0].finish_reason == "length" (see below) before
+    assuming the draft is simply short.
     """
-    if state.get("critique_pass"):
-        return "end"
-    if state.get("iteration", 0) >= MAX_ITERATIONS:
-        return "end"
-    return "revise"
-
-
-def build_graph():
-    graph = StateGraph(ResearchState)
-
-    graph.add_node("planner", planner_node)
-    graph.add_node("research", research_node)
-    graph.add_node("synthesizer", synthesizer_node)
-    graph.add_node("critic", critic_node)
-    graph.add_node("reviser", reviser_node)
-    graph.add_node("finalize", finalize_node)
-
-    graph.set_entry_point("planner")
-    graph.add_edge("planner", "research")
-    graph.add_edge("research", "synthesizer")
-    graph.add_edge("synthesizer", "critic")
-
-    graph.add_conditional_edges(
-        "critic",
-        _route_after_critic,
-        {
-            "end": "finalize",
-            "revise": "reviser",
-        },
+    client = _get_client()
+    response = client.chat.completions.create(
+        model=MODEL,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
     )
-    graph.add_edge("reviser", "critic")
-    graph.add_edge("finalize", END)
+    choice = response.choices[0]
+    if choice.finish_reason == "length":
+        # Don't fail silently — truncated output masquerading as a complete
+        # draft is exactly what caused the missing "## Sources" section earlier.
+        print(
+            f"[warning] LLM response truncated at max_tokens={max_tokens}. "
+            "Output is incomplete."
+        )
+    return choice.message.content or ""
 
-    return graph.compile()
 
-
-if __name__ == "__main__":
-    # quick manual smoke test:
-    #   GROQ_API_KEY=... TAVILY_API_KEY=... python -m graph.build_graph
-    import sys
-
-    app = build_graph()
-    topic = sys.argv[1] if len(sys.argv) > 1 else "The current state of small modular nuclear reactors"
-    result = app.invoke({"topic": topic, "iteration": 0})
-
-    print(f"--- critique_pass: {result.get('critique_pass')} | iterations used: {result.get('iteration')} ---\n")
-    print(result.get("final_report", "No final report produced."))
+def call_llm_json(
+    system: str,
+    user: str,
+    temperature: float = 0.2,
+    max_tokens: int = 2048,
+) -> Any:
+    """
+    Completion where the system prompt instructs the model to return
+    ONLY JSON. Raises if parsing fails so callers can retry/handle it
+    explicitly rather than silently getting a malformed structure.
+    """
+    raw = call_llm(system, user, temperature=temperature, max_tokens=max_tokens)
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`")
+        if cleaned.lower().startswith("json"):
+            cleaned = cleaned[4:]
+        cleaned = cleaned.strip()
+    return json.loads(cleaned)
