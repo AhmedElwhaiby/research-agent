@@ -1,0 +1,15 @@
+# secrets — never commit real keys
+.env
+
+# python
+venv/
+__pycache__/
+*.pyc
+
+# editor/OS cruft
+.vscode/
+.DS_Store
+
+# outputs from smoke tests, if you redirect them locally
+/tmp/
+*.txt
