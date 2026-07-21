@@ -12,7 +12,7 @@ from tools.search import search_web
 from tools.llm import call_llm, call_llm_json
 
 MAX_SUB_QUESTIONS = 4
-RESULTS_PER_SUB_QUESTION = 4
+RESULTS_PER_SUB_QUESTION = 2
 MAX_ITERATIONS = 2  # cap on critique/revise cycles, per the brief
 
 
@@ -110,7 +110,7 @@ def synthesizer_node(state: ResearchState) -> dict:
     )
     user = f"Topic: {topic}\n\nResearch notes:\n{context}"
 
-    draft = call_llm(system, user, temperature=0.4, max_tokens=8000)
+    draft = call_llm(system, user, temperature=0.4, max_tokens=2500)
     draft = _normalize_citation_brackets(draft)
 
     return {
@@ -229,7 +229,7 @@ def reviser_node(state: ResearchState) -> dict:
         f"Issues to fix:\n" + "\n".join(f"- {issue}" for issue in issues)
     )
 
-    revised = call_llm(system, user, temperature=0.3, max_tokens=8000)
+    revised = call_llm(system, user, temperature=0.3, max_tokens=2500)
     revised = _normalize_citation_brackets(revised)
 
     return {
