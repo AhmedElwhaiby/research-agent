@@ -8,6 +8,7 @@ Running locally
 """
 
 import gradio as gr
+import spaces
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -44,6 +45,13 @@ _NODE_LABEL: dict[str, str] = {
 # ---------------------------------------------------------------------------
 # Generator -- drives all three output components.
 # ---------------------------------------------------------------------------
+@spaces.GPU
+def _dummy_gpu_function():
+    # Hugging Face ZeroGPU spaces require at least one function to be decorated
+    # with @spaces.GPU to start the container, even if the app never calls it.
+    pass
+
+
 def run_research(topic: str):
     topic = topic.strip()
     if not topic:
