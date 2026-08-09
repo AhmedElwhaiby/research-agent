@@ -1,3 +1,14 @@
+---
+title: Research Agent
+emoji: 🔬
+colorFrom: indigo
+colorTo: blue
+sdk: gradio
+sdk_version: 4.44.0
+app_file: app.py
+pinned: false
+---
+
 # Research Agent
 
 A LangGraph-based multi-agent pipeline that takes a research topic, autonomously plans sub-questions, searches the web, drafts a cited report, critiques the draft against a rubric, and iteratively revises it until it passes or exhausts its revision budget.
