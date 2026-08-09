@@ -463,7 +463,15 @@ EXAMPLE_TOPICS = [
     ["The causes of the 2008 global financial crisis"],
 ]
 
-with gr.Blocks(title="Research Agent") as demo:
+with gr.Blocks(
+    title="Research Agent",
+    css=CSS,
+    theme=gr.themes.Base(
+        primary_hue=gr.themes.colors.blue,
+        neutral_hue=gr.themes.colors.slate,
+        font=gr.themes.GoogleFont("Inter"),
+    )
+) as demo:
 
     gr.HTML("""
     <div class="ra-header">
@@ -522,10 +530,4 @@ if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0",
         server_port=7860,
-        css=CSS,
-        theme=gr.themes.Base(
-            primary_hue=gr.themes.colors.blue,
-            neutral_hue=gr.themes.colors.slate,
-            font=gr.themes.GoogleFont("Inter"),
-        ),
     )
