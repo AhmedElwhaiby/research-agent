@@ -1,10 +1,9 @@
 """
 Shared state schema for the research agent graph.
 
-Every node reads from and writes to this TypedDict. Keeping it in one place
-(rather than scattering ad-hoc dicts across nodes) is what lets the critique
-loop (Phase 2) bolt on cleanly later: critic/reviser just add fields, they
-don't change the shape of what already exists.
+Every node reads from and writes to this TypedDict. Keeping the schema
+in one place — rather than scattering ad-hoc dicts across nodes — means
+all state fields are declared explicitly and changes propagate cleanly.
 """
 
 from typing import TypedDict, List, Dict, Optional
@@ -39,11 +38,10 @@ class ResearchState(TypedDict, total=False):
     # --- synthesizer output ---
     draft: str
 
-    # --- critic output (Phase 2 — present now so the schema doesn't change
-    # shape when the critique loop is added, only these fields start getting used) ---
+    # --- critic output ---
     critique_pass: Optional[bool]
     critique_issues: Optional[List[str]]
-    iteration: int  # how many critique/revise cycles have run, capped at 2
+    iteration: int  # number of critique/revise cycles completed
 
     # --- final output ---
     final_report: Optional[str]

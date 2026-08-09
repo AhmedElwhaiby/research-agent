@@ -1,15 +1,10 @@
 """
-~12 evaluation topics, deliberately varied across a few axes rather than
-similar-to-each-other:
+Evaluation topics, deliberately varied across several axes:
 - topic breadth (broad social-science topics vs. narrow technical ones)
-- how contested/well-studied the topic is (lots of conflicting literature
-  vs. more settled, narrower research bases)
-- how likely search results are to be thin or low-quality (mainstream
-  topics have abundant sources; niche ones stress-test what happens when
-  Tavily returns fewer/weaker results)
-
-The point isn't to re-confirm what already worked (gaming-and-teens is
-already validated manually) — it's to find where the pipeline breaks.
+- how contested/well-studied the topic is (large conflicting literature
+  vs. settled, narrower research bases)
+- source availability (mainstream topics have abundant results; niche ones
+  stress-test the pipeline when Tavily returns fewer or weaker sources)
 """
 
 TEST_TOPICS = [

@@ -1,10 +1,9 @@
 """
 Node functions: planner -> researcher -> synthesizer -> critic -> (reviser -> critic)*.
 
-Phase 1 (planner/researcher/synthesizer) is proven end to end. Phase 2 adds
-critic_node and reviser_node below, plus MAX_ITERATIONS as the loop's hard
-stopping condition — this is what build_graph.py's conditional edge checks
-to decide pass -> END vs fail -> reviser -> critic again.
+MAX_ITERATIONS controls the maximum number of critique/revise cycles.
+build_graph.py's conditional edge reads critique_pass and iteration to decide
+whether to route back to reviser or forward to finalize.
 """
 
 from graph.state import ResearchState, SubQuestionResearch
@@ -13,7 +12,7 @@ from tools.llm import call_llm, call_llm_json
 
 MAX_SUB_QUESTIONS = 4
 RESULTS_PER_SUB_QUESTION = 2
-MAX_ITERATIONS = 2  # cap on critique/revise cycles, per the brief
+MAX_ITERATIONS = 2  # maximum critique/revise cycles before finalize forces exit
 
 
 def planner_node(state: ResearchState) -> dict:
@@ -43,10 +42,10 @@ def planner_node(state: ResearchState) -> dict:
 def research_node(state: ResearchState) -> dict:
     """
     For every sub-question: search the web, then have the LLM condense each
-    result into a short grounded summary. Runs all sub-questions in one node
-    call (a simple loop) rather than as separate LangGraph nodes per question —
-    keeps the graph shape simple for Phase 1; can be split into a fan-out/
-    fan-in subgraph later if per-question retries are needed.
+    result into a short grounded summary. Runs all sub-questions sequentially
+    in one node call rather than as separate LangGraph nodes per question —
+    keeps the graph shape simple; can be split into a fan-out/fan-in subgraph
+    later if per-question retries are needed.
     """
     research: dict[str, SubQuestionResearch] = {}
 

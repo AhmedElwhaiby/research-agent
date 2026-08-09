@@ -55,8 +55,9 @@ def call_llm(
     )
     choice = response.choices[0]
     if choice.finish_reason == "length":
-        # Don't fail silently — truncated output masquerading as a complete
-        # draft is exactly what caused the missing "## Sources" section earlier.
+        # Truncated output that looks complete is a silent failure mode —
+        # a report cut off before reaching "## Sources" will pass length checks
+        # but fail citation consistency. Emit a warning so it is not overlooked.
         print(
             f"[warning] LLM response truncated at max_tokens={max_tokens}. "
             "Output is incomplete."

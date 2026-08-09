@@ -12,16 +12,17 @@ delay between topics to stay under the account's TPM cap rather than
 firing requests back-to-back and expecting them all to clear.
 
 This does NOT check factual accuracy of citations (whether [3] really
-says what the draft claims) — that still needs a human spot-check, same
-as the manual check already done on the gaming-and-teens topic. This
-script only catches what's mechanically checkable: is there a citation
-marker, does it resolve to a real source, is the coverage consistent
-across different topic types.
+says what the draft claims) — that requires human spot-checking. This
+script only catches what is mechanically verifiable: citation marker
+presence, marker-to-source resolution, and coverage consistency across
+different topic types.
 """
 
 import time
 import traceback
 from datetime import datetime
+
+from dotenv import load_dotenv
 
 from graph.build_graph import build_graph
 from eval.test_topics import TEST_TOPICS
@@ -31,6 +32,7 @@ SECONDS_BETWEEN_TOPICS = 20  # pacing to stay under the 8000 TPM account cap
 
 
 def run_eval():
+    load_dotenv()
     app = build_graph()
     results = []
 
@@ -47,6 +49,7 @@ def run_eval():
                 "topic": topic,
                 "status": "ok",
                 "critique_pass": state.get("critique_pass"),
+                "critique_issues": state.get("critique_issues", []),
                 "iterations": state.get("iteration"),
                 "duration_sec": round(time.time() - start, 1),
                 **check,
@@ -56,7 +59,8 @@ def run_eval():
                 f"iterations={result['iterations']} "
                 f"coverage={result['coverage_pct']}% "
                 f"orphaned={len(result['orphaned_citations'])} "
-                f"unused={len(result['unused_sources'])}"
+                f"unused={len(result['unused_sources'])} "
+                f"critic_issues={result['critique_issues']}"
             )
 
         except Exception as e:
@@ -121,6 +125,10 @@ def _save_results(results: list[dict]):
         lines.append(f"- coverage: {r['coverage_pct']}% ({r['cited_sentences']}/{r['total_sentences']} sentences)")
         lines.append(f"- orphaned citations: {r['orphaned_citations']}")
         lines.append(f"- unused sources: {r['unused_sources']}")
+        if r.get("critique_issues"):
+            lines.append("- critique issues:")
+            for issue in r["critique_issues"]:
+                lines.append(f"  - {issue}")
         if r["uncited_sentences"]:
             lines.append("- uncited sentences (sample):")
             for s in r["uncited_sentences"][:3]:

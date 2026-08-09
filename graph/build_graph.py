@@ -1,16 +1,15 @@
 """
 Wires nodes into a LangGraph StateGraph:
 
-    planner -> research -> synthesizer -> critic --pass--> END
+    planner -> research -> synthesizer -> critic --pass--> finalize -> END
                                               |
                                             fail
                                               v
                                            reviser --> critic (loop, capped at MAX_ITERATIONS)
 
-The loop's stopping condition lives in _should_continue: pass, or hitting
-MAX_ITERATIONS, both route to END. Failing before the cap routes back to
-reviser. This is the only structural change from the Phase 1 straight line —
-everything before the critic node is unchanged.
+The loop's stopping condition lives in _route_after_critic: pass, or hitting
+MAX_ITERATIONS, both route to finalize. Failing before the cap routes back to
+reviser.
 """
 
 from langgraph.graph import StateGraph, END
@@ -74,9 +73,11 @@ def build_graph():
 
 if __name__ == "__main__":
     # quick manual smoke test:
-    #   GROQ_API_KEY=... TAVILY_API_KEY=... python -m graph.build_graph
+    #   python -m graph.build_graph ["optional topic"]
     import sys
+    from dotenv import load_dotenv
 
+    load_dotenv()
     app = build_graph()
     topic = sys.argv[1] if len(sys.argv) > 1 else "The current state of small modular nuclear reactors"
     result = app.invoke({"topic": topic, "iteration": 0})

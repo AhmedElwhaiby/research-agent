@@ -10,6 +10,6 @@ __pycache__/
 .vscode/
 .DS_Store
 
-# outputs from smoke tests, if you redirect them locally
-/tmp/
+# local smoke-test output redirects
 *.txt
+!requirements.txt

@@ -24,6 +24,52 @@ SKIP_LINE_PATTERN = re.compile(
     r"^\s*(#{1,6}\s|>\s*\*\*Note|\|.*\||-{3,}\s*$)"
 )
 
+# Patterns that look like an abbreviation period, not a sentence-ending
+# period.  After a naive split on ". ", fragments ending with one of these
+# get re-joined with the next fragment instead of being treated as a
+# standalone sentence.
+#
+# Covers:
+#   - Multi-letter abbreviations: U.S., U.K., E.U., U.N., D.C., etc.
+#   - Title/rank abbreviations: Dr., Mr., Mrs., Prof., Gen., Gov., etc.
+#   - Common prose abbreviations: vs., approx., etc., e.g., i.e., no., vol.
+_ABBREVIATION_TAIL_RE = re.compile(
+    r"(?:"
+    r"[A-Z]\.[A-Z]"                                          # U.S, E.U, …
+    r"|(?:Dr|Mr|Mrs|Ms|Prof|Inc|Corp|Ltd|Jr|Sr|Gen|Gov|Rep"
+    r"|Sen|Sgt|Cpl|St|Ave|Blvd|vs|approx|etc|dept|govt"
+    r"|est|no|vol|fig|eq)"
+    r")\.\s*$",
+    re.IGNORECASE,
+)
+
+# e.g. and i.e. need their own pattern because the inner period makes the
+# generic word-boundary approach above unreliable.
+_LATIN_ABBREV_TAIL_RE = re.compile(r"(?:e\.g|i\.e)\.\s*$", re.IGNORECASE)
+
+
+def _split_sentences(text: str) -> List[str]:
+    """
+    Split *text* into sentences, then re-join any fragment that was broken
+    on an abbreviation period rather than a real sentence boundary.
+
+    Two passes:
+      1. Naive split on sentence-ending punctuation followed by whitespace.
+      2. Walk the fragments: if the previous fragment ends with a known
+         abbreviation pattern, glue the current fragment back onto it.
+    """
+    raw = re.split(r"(?<=[.!?])\s+", text.strip())
+    merged: List[str] = []
+    for fragment in raw:
+        if merged and (
+            _ABBREVIATION_TAIL_RE.search(merged[-1])
+            or _LATIN_ABBREV_TAIL_RE.search(merged[-1])
+        ):
+            merged[-1] += " " + fragment
+        else:
+            merged.append(fragment)
+    return [s for s in merged if s.strip()]
+
 
 class CoverageResult(TypedDict):
     total_sentences: int
@@ -58,10 +104,9 @@ def parse_source_numbers(sources_section: str) -> Dict[str, str]:
 
 def check_citation_coverage(body: str) -> CoverageResult:
     """
-    Splits the body into sentences (naive split on '.', '!', '?' followed by
-    whitespace — good enough for prose, not meant to handle abbreviations
-    perfectly) and checks each non-structural sentence for at least one
-    [n] citation marker.
+    Splits the body into sentences (abbreviation-aware — see
+    _split_sentences) and checks each non-structural sentence for at least
+    one [n] citation marker.
     """
     uncited: List[str] = []
     total = 0
@@ -70,8 +115,7 @@ def check_citation_coverage(body: str) -> CoverageResult:
     for line in body.splitlines():
         if not line.strip() or SKIP_LINE_PATTERN.match(line):
             continue
-        sentences = re.split(r"(?<=[.!?])\s+", line.strip())
-        for sentence in sentences:
+        for sentence in _split_sentences(line):
             sentence = sentence.strip()
             if not sentence:
                 continue
